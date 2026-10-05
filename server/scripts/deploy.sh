@@ -32,20 +32,52 @@ if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/install.sh" ]; then
   fi
 else
   echo "[1/3] Downloading latest Phoenix Server codebase..."
-  if ! command -v git &> /dev/null; then
-    if command -v dnf &> /dev/null; then
-      dnf install -y git || true
-    elif command -v apt-get &> /dev/null; then
-      apt-get update -y && apt-get install -y git || true
-    fi
+  
+  # Ensure ca-certificates, curl, tar, git are present
+  if command -v dnf &> /dev/null; then
+    dnf install -y ca-certificates curl tar git || true
+  elif command -v apt-get &> /dev/null; then
+    apt-get update -y && apt-get install -y ca-certificates curl tar git || true
   fi
 
   TEMP_CLONE_DIR=$(mktemp -d)
-  if git clone https://github.com/justcool-dev/phoenix.git "$TEMP_CLONE_DIR"; then
-    cp -r "$TEMP_CLONE_DIR/server"/* "$TARGET_DIR/"
-    rm -rf "$TEMP_CLONE_DIR"
-  else
-    echo "[ERROR] Failed to clone Phoenix repository. Ensure internet connectivity and git availability."
+  DOWNLOAD_SUCCESS=0
+
+  # Strategy 1: Git clone
+  if command -v git &> /dev/null && git clone --depth 1 https://github.com/justcool-dev/phoenix.git "$TEMP_CLONE_DIR/repo" 2>/dev/null; then
+    echo "[INFO] Successfully cloned repository via git."
+    cp -r "$TEMP_CLONE_DIR/repo/server"/* "$TARGET_DIR/"
+    DOWNLOAD_SUCCESS=1
+  # Strategy 2: Tarball download via curl / wget
+  elif curl -fsSL "https://github.com/justcool-dev/phoenix/archive/refs/heads/main.tar.gz" -o "$TEMP_CLONE_DIR/archive.tar.gz" 2>/dev/null; then
+    echo "[INFO] Downloaded repository archive via curl."
+    mkdir -p "$TEMP_CLONE_DIR/extracted"
+    tar -xzf "$TEMP_CLONE_DIR/archive.tar.gz" -C "$TEMP_CLONE_DIR/extracted" --strip-components=1
+    cp -r "$TEMP_CLONE_DIR/extracted/server"/* "$TARGET_DIR/"
+    DOWNLOAD_SUCCESS=1
+  fi
+
+  rm -rf "$TEMP_CLONE_DIR"
+
+  if [ "$DOWNLOAD_SUCCESS" -ne 1 ]; then
+    echo "----------------------------------------------------------------------"
+    echo "[ERROR] Could not download Phoenix repository from GitHub."
+    echo ""
+    echo "Possible causes:"
+    echo "  1. You haven't pushed your code to GitHub yet."
+    echo "     -> Run these commands on your local machine first:"
+    echo "        git init"
+    echo "        git add ."
+    echo "        git commit -m \"Initial commit\""
+    echo "        git branch -M main"
+    echo "        git remote add origin https://github.com/justcool-dev/phoenix.git"
+    echo "        git push -u origin main"
+    echo ""
+    echo "  2. The repository is PRIVATE."
+    echo "     -> On your server, clone with your GitHub credentials or SSH key:"
+    echo "        git clone https://github.com/justcool-dev/phoenix.git"
+    echo "        cd phoenix/server && sudo ./scripts/install.sh"
+    echo "----------------------------------------------------------------------"
     exit 1
   fi
 fi
