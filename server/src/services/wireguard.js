@@ -12,6 +12,13 @@ const BASE64_KEY_REGEX = /^[A-Za-z0-9+/]{42}[AEIMQUYcgkosw048]=$/;
 const IPV4_SINGLE_REGEX = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
 const IPV4_CIDR_REGEX = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/([0-9]|[1-2][0-9]|3[0-2])$/;
 
+function getWgBinaryPath() {
+  if (process.platform !== 'linux') return 'wg';
+  if (fs.existsSync('/usr/bin/wg')) return '/usr/bin/wg';
+  if (fs.existsSync('/usr/sbin/wg')) return '/usr/sbin/wg';
+  return 'wg';
+}
+
 class WireGuardService {
   constructor() {
     this.interfaceName = config.wireguard.interface;
@@ -41,7 +48,8 @@ class WireGuardService {
       // In production environment on Linux, wg commands require root or sudo access.
       const isLinux = process.platform === 'linux';
       const cmd = isLinux ? 'sudo' : 'wg';
-      const cmdArgs = isLinux ? ['/usr/bin/wg', ...args] : args;
+      const wgBin = getWgBinaryPath();
+      const cmdArgs = isLinux ? [wgBin, ...args] : args;
 
       const { stdout, stderr } = await execFileAsync(cmd, cmdArgs);
       if (stderr && stderr.trim().length > 0) {
@@ -95,7 +103,8 @@ class WireGuardService {
     }
     const isLinux = process.platform === 'linux';
     const cmd = isLinux ? 'sudo' : 'wg';
-    const cmdArgs = isLinux ? ['/usr/bin/wg', 'pubkey'] : ['pubkey'];
+    const wgBin = getWgBinaryPath();
+    const cmdArgs = isLinux ? [wgBin, 'pubkey'] : ['pubkey'];
 
     return new Promise((resolve, reject) => {
       const child = execFile(cmd, cmdArgs, (err, stdout, stderr) => {

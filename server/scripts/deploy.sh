@@ -11,7 +11,7 @@ echo "======================================================================"
 
 if [ "$EUID" -ne 0 ]; then
   echo "[ERROR] Please run this deployment script as root:"
-  echo "        sudo bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/justcool-dev/phoenix/main/server/scripts/deploy.sh)\""
+  echo "        sudo bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/justcool-dev/phoenix/refs/heads/main/server/scripts/deploy.sh)\""
   exit 1
 fi
 

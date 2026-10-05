@@ -30,17 +30,17 @@ if [ "$OS_FAMILY" = "rhel" ]; then
     PKG_MGR="yum"
   fi
   $PKG_MGR install -y epel-release || true
-  $PKG_MGR install -y wireguard-tools sqlite iptables firewalld curl wget ca-certificates gcc-c++ make
+  $PKG_MGR install -y wireguard-tools sqlite iptables firewalld curl wget ca-certificates gcc-c++ make sudo tar python3 git || true
 elif [ "$OS_FAMILY" = "debian" ]; then
   echo "[INFO] Running package installation via apt-get..."
   apt-get update -y
-  apt-get install -y curl wget wireguard sqlite3 ufw iptables ca-certificates build-essential
+  apt-get install -y curl wget wireguard sqlite3 ufw iptables ca-certificates build-essential sudo tar python3 git || true
 else
   echo "[WARN] Unrecognized Linux distribution. Attempting generic package installation..."
   if command -v apt-get &>/dev/null; then
-    apt-get update -y && apt-get install -y curl wget wireguard sqlite3 ufw iptables ca-certificates build-essential || true
+    apt-get update -y && apt-get install -y curl wget wireguard sqlite3 ufw iptables ca-certificates build-essential sudo tar python3 git || true
   elif command -v dnf &>/dev/null; then
-    dnf install -y wireguard-tools sqlite iptables firewalld curl wget ca-certificates gcc-c++ make || true
+    dnf install -y wireguard-tools sqlite iptables firewalld curl wget ca-certificates gcc-c++ make sudo tar python3 git || true
   fi
 fi
 
@@ -48,13 +48,25 @@ echo "[2/6] Checking Node.js LTS installation..."
 if ! command -v node &> /dev/null; then
   echo "[INFO] Node.js not found. Installing Node.js 20 LTS..."
   if [ "$OS_FAMILY" = "rhel" ]; then
+    $PKG_MGR module disable nodejs -y 2>/dev/null || true
     curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
-    $PKG_MGR install -y nodejs
+    $PKG_MGR install -y nodejs || $PKG_MGR install -y nodejs20 || true
   else
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-    apt-get install -y nodejs
+    apt-get install -y nodejs || true
   fi
 fi
+
+if ! command -v node &> /dev/null; then
+  echo "[WARN] NodeSource installation did not provide 'node'. Attempting direct Node.js LTS binary installation..."
+  NODE_VER="v20.18.0"
+  ARCH="x64"
+  if [ "$(uname -m)" = "aarch64" ]; then ARCH="arm64"; fi
+  curl -fsSL "https://nodejs.org/dist/${NODE_VER}/node-${NODE_VER}-linux-${ARCH}.tar.xz" -o /tmp/node.tar.xz
+  tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1
+  rm -f /tmp/node.tar.xz
+fi
+
 echo "[INFO] Node.js version: $(node -v)"
 
 echo "[3/6] Creating system user 'phoenix'..."
@@ -112,7 +124,7 @@ chown -R phoenix:phoenix /opt/phoenix
 echo "[5/6] Setting up restricted sudoers rule..."
 cat << 'EOF' > /etc/sudoers.d/phoenix
 # Sudoers permissions for Phoenix API Server
-phoenix ALL=(ALL) NOPASSWD: /usr/bin/wg show wg0 dump, /usr/bin/wg show wg0 public-key, /usr/bin/wg set wg0 peer * allowed-ips *, /usr/bin/wg set wg0 peer * remove, /usr/bin/wg pubkey, /bin/systemctl reload wg-quick@wg0
+phoenix ALL=(ALL) NOPASSWD: /usr/bin/wg show wg0 dump, /usr/sbin/wg show wg0 dump, /usr/bin/wg show wg0 public-key, /usr/sbin/wg show wg0 public-key, /usr/bin/wg set wg0 peer * allowed-ips *, /usr/sbin/wg set wg0 peer * allowed-ips *, /usr/bin/wg set wg0 peer * remove, /usr/sbin/wg set wg0 peer * remove, /usr/bin/wg pubkey, /usr/sbin/wg pubkey, /bin/systemctl reload wg-quick@wg0, /usr/bin/systemctl reload wg-quick@wg0
 EOF
 chmod 0440 /etc/sudoers.d/phoenix
 

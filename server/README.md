@@ -35,7 +35,7 @@ Serveur backend Node.js API et gestionnaire d'interface WireGuard pour l'applica
 Pour déployer automatiquement le serveur Phoenix sur n'importe quel serveur Linux (**Rocky Linux 8/9**, **AlmaLinux**, **RHEL**, **Ubuntu**, **Debian**), exécutez simplement cette commande unique en tant que `root` :
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/justcool-dev/phoenix/main/server/scripts/deploy.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/justcool-dev/phoenix/refs/heads/main/server/scripts/deploy.sh | sudo bash
 ```
 
 Ou en local depuis le dossier du projet :
