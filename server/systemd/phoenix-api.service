@@ -1,0 +1,22 @@
+[Unit]
+Description=Phoenix Node.js API Service
+After=network.target wg-quick@wg0.service
+Wants=wg-quick@wg0.service
+
+[Service]
+Type=simple
+User=phoenix
+Group=phoenix
+WorkingDirectory=/opt/phoenix/server
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+# Security Hardening Options
+ProtectSystem=full
+ProtectHome=true
+NoNewPrivileges=false
+
+[Install]
+WantedBy=multi-user.target

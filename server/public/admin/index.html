@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phoenix - Tableau de Bord Administrateur</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <!-- LOGIN VIEW -->
+  <div id="login-screen" class="screen-container active">
+    <div class="login-card">
+      <div class="logo-box">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+        <h1>Phoenix Admin</h1>
+      </div>
+      <p class="subtitle">Connexion au serveur de gestion WireGuard</p>
+      
+      <form id="login-form">
+        <div class="form-group">
+          <label for="admin-user">Identifiant Administrateur</label>
+          <input type="text" id="admin-user" placeholder="admin" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="admin-pass">Mot de passe</label>
+          <input type="password" id="admin-pass" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <div id="login-error" class="error-msg hidden"></div>
+        <button type="submit" class="btn-primary">Se Connecter</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN ADMIN DASHBOARD VIEW -->
+  <div id="admin-screen" class="screen-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+        <span class="sidebar-title">Phoenix Admin</span>
+      </div>
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-tab="tab-overview">
+          📊 Vue d'ensemble
+        </button>
+        <button class="nav-item" data-tab="tab-clients">
+          💻 Clients WireGuard
+        </button>
+        <button class="nav-item" data-tab="tab-users">
+          👥 Utilisateurs & Allocations
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <span id="user-badge" class="user-badge">Admin</span>
+        <button id="logout-btn" class="btn-logout">Déconnexion</button>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <!-- TAB 1: OVERVIEW -->
+      <section id="tab-overview" class="admin-tab active">
+        <header class="tab-header">
+          <h2>Vue d'ensemble du Serveur VPN</h2>
+          <button id="reload-wg-btn" class="btn-secondary">🔄 Recharger WireGuard</button>
+        </header>
+
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <span class="metric-title">Statut Service</span>
+            <div id="status-pill" class="status-pill active">ACTIF</div>
+            <span id="interface-name" class="metric-sub">Interface: wg0</span>
+          </div>
+
+          <div class="metric-card">
+            <span class="metric-title">Peers Connectés</span>
+            <span id="metric-active-peers" class="metric-value">0</span>
+            <span id="metric-total-clients" class="metric-sub">Sur 0 enregistrés</span>
+          </div>
+
+          <div class="metric-card">
+            <span class="metric-title">Bande Passante Reçue (Download)</span>
+            <span id="metric-rx" class="metric-value">0 MB</span>
+            <span class="metric-sub">Total cumulé</span>
+          </div>
+
+          <div class="metric-card">
+            <span class="metric-title">Bande Passante Émise (Upload)</span>
+            <span id="metric-tx" class="metric-value">0 MB</span>
+            <span class="metric-sub">Total cumulé</span>
+          </div>
+        </div>
+
+        <div class="server-config-box">
+          <h3>Informations Réseau Server</h3>
+          <div class="config-details-grid">
+            <div class="config-item">
+              <span class="label">Clé Publique Server :</span>
+              <code id="server-pubkey">Chargement...</code>
+            </div>
+            <div class="config-item">
+              <span class="label">Endpoint Public :</span>
+              <span id="server-endpoint">212.132.119.66:51820</span>
+            </div>
+            <div class="config-item">
+              <span class="label">Sous-réseau VPN :</span>
+              <span>10.66.66.0/24</span>
+            </div>
+            <div class="config-item">
+              <span class="label">DNS Recommandé :</span>
+              <span>1.1.1.1, 8.8.8.8</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: CLIENTS -->
+      <section id="tab-clients" class="admin-tab">
+        <header class="tab-header">
+          <h2>Gestion des Appareils / Clients WireGuard</h2>
+          <button id="new-client-btn" class="btn-primary">+ Ajouter un client</button>
+        </header>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nom Appareil</th>
+                <th>Adresse IP VPN</th>
+                <th>Clé Publique</th>
+                <th>Dernier Handshake</th>
+                <th>Données Rx / Tx</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="clients-tbody">
+              <tr><td colspan="6" class="empty-cell">Chargement des clients...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 3: USERS -->
+      <section id="tab-users" class="admin-tab">
+        <header class="tab-header">
+          <h2>Utilisateurs et Allocations</h2>
+        </header>
+
+        <div class="info-banner">
+          <p>Chaque utilisateur enregistré peut posséder plusieurs appareils VPN. Utilisez cet écran pour consulter les allocations.</p>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nom d'utilisateur</th>
+                <th>Rôle</th>
+                <th>Date d'inscription</th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody">
+              <tr><td colspan="4" class="empty-cell">Chargement...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

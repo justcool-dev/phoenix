@@ -1,0 +1,9 @@
+# Minimal sudoers configuration for phoenix user
+# Place in /etc/sudoers.d/phoenix (chmod 0440)
+
+phoenix ALL=(ALL) NOPASSWD: /usr/bin/wg show wg0 dump, \
+                        /usr/bin/wg show wg0 public-key, \
+                        /usr/bin/wg set wg0 peer * allowed-ips *, \
+                        /usr/bin/wg set wg0 peer * remove, \
+                        /usr/bin/wg pubkey, \
+                        /bin/systemctl reload wg-quick@wg0

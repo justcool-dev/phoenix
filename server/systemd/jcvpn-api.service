@@ -1,0 +1,22 @@
+[Unit]
+Description=JC VPN Node.js API Service
+After=network.target wg-quick@wg0.service
+Wants=wg-quick@wg0.service
+
+[Service]
+Type=simple
+User=jcvpn
+Group=jcvpn
+WorkingDirectory=/opt/jcvpn/server
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+# Security Hardening Options
+ProtectSystem=full
+ProtectHome=true
+NoNewPrivileges=false
+
+[Install]
+WantedBy=multi-user.target
