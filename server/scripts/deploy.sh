@@ -26,9 +26,14 @@ fi
 # Check if local installation files are available
 if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/install.sh" ]; then
   echo "[1/3] Using local installation files from $SCRIPT_DIR..."
-  SERVER_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
-  if [ "$SERVER_DIR" != "$TARGET_DIR" ]; then
-    cp -r "$SERVER_DIR"/* "$TARGET_DIR/"
+  SERVER_DIR="$( cd "$SCRIPT_DIR/.." && pwd -P )"
+  REAL_TARGET="$( cd "$TARGET_DIR" && pwd -P )"
+  if [ "$SERVER_DIR" != "$REAL_TARGET" ]; then
+    if command -v rsync &>/dev/null; then
+      rsync -a --exclude='node_modules' --exclude='.git' "$SERVER_DIR/" "$REAL_TARGET/"
+    else
+      cp -ru "$SERVER_DIR"/* "$REAL_TARGET/" 2>/dev/null || cp -r "$SERVER_DIR"/* "$REAL_TARGET/" || true
+    fi
   fi
 else
   echo "[1/3] Downloading latest Phoenix Server codebase..."

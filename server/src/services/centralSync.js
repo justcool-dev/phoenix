@@ -47,42 +47,49 @@ class CentralSyncService {
   }
 
   /**
-   * Send heartbeat telemetry to central master server (e.g. adminvpn.jcdev.top)
+   * Send heartbeat telemetry to central master server (e.g. http://vpn.jcdev.top:9300)
    */
   async sendHeartbeat() {
-    if (!this.centralUrl) return;
+    let targetUrl = this.centralUrl || process.env.CENTRAL_MANAGEMENT_URL || 'http://vpn.jcdev.top:9300';
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      targetUrl = `http://${targetUrl}`;
+    }
 
     try {
       const telemetry = await this.getNodeTelemetry();
-      const url = `${this.centralUrl.replace(/\/+$/, '')}/api/nodes/heartbeat`;
+      const fullUrl = `${targetUrl.replace(/\/+$/, '')}/api/nodes/heartbeat`;
 
-      const httpLib = url.startsWith('https') ? require('https') : require('http');
-      const parsedUrl = new URL(url);
+      const parsedUrl = new URL(fullUrl);
+      const httpLib = parsedUrl.protocol === 'https:' ? require('https') : require('http');
 
       const postData = JSON.stringify(telemetry);
       const options = {
         hostname: parsedUrl.hostname,
-        port: parsedUrl.port || (url.startsWith('https') ? 443 : 80),
+        port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
         path: parsedUrl.pathname + parsedUrl.search,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(postData),
-          'X-Central-Token': this.nodeSecret,
+          'X-Central-Token': this.nodeSecret || 'phoenix-node-secret-key',
         },
-        timeout: 5000,
+        timeout: 8000,
       };
 
       const req = httpLib.request(options, (res) => {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          logger.info(`Successfully posted telemetry heartbeat to central server: ${this.centralUrl}`);
-        } else {
-          logger.warn(`Central server returned status ${res.statusCode} on heartbeat`);
-        }
+        let body = '';
+        res.on('data', d => body += d);
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            logger.info(`Successfully posted telemetry heartbeat to central server: ${targetUrl}`);
+          } else {
+            logger.warn(`Central server returned status ${res.statusCode} on heartbeat: ${body}`);
+          }
+        });
       });
 
       req.on('error', (err) => {
-        logger.warn(`Notice: Central server unreachable at ${this.centralUrl}: ${err.message}`);
+        logger.warn(`Notice: Central server unreachable at ${targetUrl}: ${err.message}`);
       });
 
       req.write(postData);

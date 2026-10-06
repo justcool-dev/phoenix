@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Capture absolute script directory and source server directory AT THE VERY START
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+SRC_SERVER_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
+
 echo "=================================================="
-echo "      PHOENIX SERVER AUTOMATED INSTALLATION       "
+echo "      JC VPN SERVER AUTOMATED INSTALLATION        "
 echo "=================================================="
 
 if [ "$EUID" -ne 0 ]; then
@@ -10,141 +14,93 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-# Detect OS distribution family (RHEL/Rocky/Alma vs Debian/Ubuntu)
-OS_FAMILY="unknown"
-if [ -f /etc/os-release ]; then
-  . /etc/os-release
-  if [[ "${ID:-}" =~ ^(rocky|almalinux|rhel|centos|fedora)$ ]] || [[ "${ID_LIKE:-}" =~ (rhel|fedora) ]]; then
-    OS_FAMILY="rhel"
-  elif [[ "${ID:-}" =~ ^(ubuntu|debian)$ ]] || [[ "${ID_LIKE:-}" =~ debian ]]; then
-    OS_FAMILY="debian"
-  fi
-fi
+export DEBIAN_FRONTEND=noninteractive
 
-echo "[1/6] Installing prerequisites for OS family: $OS_FAMILY..."
+echo "[1/6] Fixing apt broken dependencies & installing prerequisites..."
+apt-get -y --fix-broken install || true
+apt-get update -y || true
 
-if [ "$OS_FAMILY" = "rhel" ]; then
-  echo "[INFO] Running package installation via dnf/yum..."
-  PKG_MGR="dnf"
-  if ! command -v dnf &>/dev/null; then
-    PKG_MGR="yum"
-  fi
-  $PKG_MGR install -y epel-release || true
-  $PKG_MGR install -y wireguard-tools sqlite iptables firewalld curl wget ca-certificates gcc-c++ make sudo tar python3 git || true
-elif [ "$OS_FAMILY" = "debian" ]; then
-  echo "[INFO] Running package installation via apt-get..."
-  apt-get update -y
-  apt-get install -y curl wget wireguard sqlite3 ufw iptables ca-certificates build-essential sudo tar python3 git || true
-else
-  echo "[WARN] Unrecognized Linux distribution. Attempting generic package installation..."
-  if command -v apt-get &>/dev/null; then
-    apt-get update -y && apt-get install -y curl wget wireguard sqlite3 ufw iptables ca-certificates build-essential sudo tar python3 git || true
-  elif command -v dnf &>/dev/null; then
-    dnf install -y wireguard-tools sqlite iptables firewalld curl wget ca-certificates gcc-c++ make sudo tar python3 git || true
-  fi
-fi
+apt-get install -y wireguard wireguard-tools sqlite3 ufw iptables ca-certificates curl wget git || {
+  apt-get -y --fix-broken install
+  apt-get install -y wireguard wireguard-tools sqlite3 ufw iptables ca-certificates curl wget git
+}
 
 echo "[2/6] Checking Node.js LTS installation..."
 if ! command -v node &> /dev/null; then
-  echo "[INFO] Node.js not found. Installing Node.js 20 LTS..."
-  if [ "$OS_FAMILY" = "rhel" ]; then
-    $PKG_MGR module disable nodejs -y 2>/dev/null || true
-    curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
-    $PKG_MGR install -y nodejs || $PKG_MGR install -y nodejs20 || true
-  else
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-    apt-get install -y nodejs || true
-  fi
+  echo "Node.js not found. Installing Node.js 20 LTS..."
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  apt-get install -y nodejs
+fi
+echo "Node.js version: $(node -v)"
+
+echo "[3/6] Creating system user 'jcvpn'..."
+if ! id "jcvpn" &>/dev/null; then
+  useradd -r -s /bin/bash jcvpn || true
+  echo "Created user 'jcvpn'."
 fi
 
-if ! command -v node &> /dev/null; then
-  echo "[WARN] NodeSource installation did not provide 'node'. Attempting direct Node.js LTS binary installation..."
-  NODE_VER="v20.18.0"
-  ARCH="x64"
-  if [ "$(uname -m)" = "aarch64" ]; then ARCH="arm64"; fi
-  curl -fsSL "https://nodejs.org/dist/${NODE_VER}/node-${NODE_VER}-linux-${ARCH}.tar.xz" -o /tmp/node.tar.xz
-  tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1
-  rm -f /tmp/node.tar.xz
-fi
-
-echo "[INFO] Node.js version: $(node -v)"
-
-echo "[3/6] Creating system user 'phoenix'..."
-if ! id "phoenix" &>/dev/null; then
-  useradd -r -s /bin/bash phoenix || true
-  echo "[INFO] Created user 'phoenix'."
-fi
-
-echo "[4/6] Preparing application directory /opt/phoenix..."
-TARGET_DIR="/opt/phoenix/server"
+echo "[4/6] Preparing application directory /opt/jcvpn..."
+TARGET_DIR="/opt/jcvpn/server"
 mkdir -p "$TARGET_DIR/data"
 mkdir -p "$TARGET_DIR/logs"
 mkdir -p "$TARGET_DIR/certs"
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-SRC_SERVER_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
-
-# Only copy if source and target are different directories
 if [ "$SRC_SERVER_DIR" != "$TARGET_DIR" ]; then
-  echo "[INFO] Copying application files from $SRC_SERVER_DIR to $TARGET_DIR..."
-  cp -r "$SRC_SERVER_DIR"/* "$TARGET_DIR/"
+  echo "Copying application files from $SRC_SERVER_DIR to $TARGET_DIR..."
+  cp -r "$SRC_SERVER_DIR"/. "$TARGET_DIR/"
 fi
 
 cd "$TARGET_DIR"
 npm install --production
 
-# Auto-detect Public IP Address
-PUBLIC_IP=$(curl -s --max-time 5 https://api.ipify.org || curl -s --max-time 5 https://ifconfig.me || echo "YOUR_SERVER_IP")
-echo "[INFO] Auto-detected Server Public IP: $PUBLIC_IP"
-
 if [ ! -f "$TARGET_DIR/.env" ]; then
-  if [ -f .env.example ]; then
-    cp .env.example .env
+  if [ -f "$TARGET_DIR/.env.example" ]; then
+    cp "$TARGET_DIR/.env.example" "$TARGET_DIR/.env"
   else
-    cat << EOF > .env
+    cat << EOF > "$TARGET_DIR/.env"
+NODE_ENV=production
 PORT=9300
 HOST=0.0.0.0
-NODE_ENV=production
-DATABASE_PATH=./data/phoenix.db
-JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || echo "phoenix_jwt_secret_random_key_$(date +%s)")
-WIREGUARD_ENDPOINT=${PUBLIC_IP}:51820
+JWT_SECRET=replace_this_with_a_super_secret_jwt_key_32bytes_min
+JWT_EXPIRES_IN=86400
+REFRESH_TOKEN_EXPIRES_IN=604800
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD_HASH=10af59554a0a0c473f21084a33a4b292444c70453059a5e6f29c87fdb216e698.4fc627281c956916c9cb0fd05832d523
+DATABASE_PATH=./data/jcvpn.db
 WIREGUARD_INTERFACE=wg0
-WIREGUARD_PORT=51820
+WIREGUARD_PORT=9301
 VPN_NETWORK=10.66.66.0/24
 VPN_SERVER_ADDRESS=10.66.66.1
-CENTRAL_MANAGEMENT_URL=https://adminvpn.jcdev.top
+WIREGUARD_ENDPOINT=VOTRE_IP_SERVEUR:9301
+WIREGUARD_DNS=1.1.1.1, 8.8.8.8
+WIREGUARD_CONFIG_PATH=/etc/wireguard/wg0.conf
 EOF
   fi
-  sed -i "s/WIREGUARD_ENDPOINT=.*/WIREGUARD_ENDPOINT=${PUBLIC_IP}:51820/" .env || true
-  echo "[NOTICE] Created $TARGET_DIR/.env with server IP endpoint ${PUBLIC_IP}:51820."
+  echo "[NOTICE] Created default $TARGET_DIR/.env file."
 fi
 
-chown -R phoenix:phoenix /opt/phoenix
+PUBLIC_IP=$(curl -s https://api.ipify.org || curl -s https://ifconfig.me || curl -s https://icanhazip.com || echo "")
+if [ -n "$PUBLIC_IP" ]; then
+  echo "[INFO] Auto-configuring WIREGUARD_ENDPOINT in .env with public IP: ${PUBLIC_IP}:9301"
+  sed -i "s|^WIREGUARD_ENDPOINT=.*|WIREGUARD_ENDPOINT=${PUBLIC_IP}:9301|" "$TARGET_DIR/.env"
+fi
+
+chown -R jcvpn:jcvpn /opt/jcvpn
 
 echo "[5/6] Setting up restricted sudoers rule..."
-cat << 'EOF' > /etc/sudoers.d/phoenix
-# Sudoers permissions for Phoenix API Server
-phoenix ALL=(ALL) NOPASSWD: /usr/bin/wg show wg0 dump, /usr/sbin/wg show wg0 dump, /usr/bin/wg show wg0 public-key, /usr/sbin/wg show wg0 public-key, /usr/bin/wg set wg0 peer * allowed-ips *, /usr/sbin/wg set wg0 peer * allowed-ips *, /usr/bin/wg set wg0 peer * remove, /usr/sbin/wg set wg0 peer * remove, /usr/bin/wg pubkey, /usr/sbin/wg pubkey, /bin/systemctl reload wg-quick@wg0, /usr/bin/systemctl reload wg-quick@wg0
+cat << 'EOF' > /etc/sudoers.d/jcvpn
+jcvpn ALL=(ALL) NOPASSWD: /usr/bin/wg show wg0 dump, /usr/bin/wg show wg0 public-key, /usr/bin/wg set wg0 peer * allowed-ips *, /usr/bin/wg set wg0 peer * remove, /usr/bin/wg pubkey, /bin/systemctl reload wg-quick@wg0
 EOF
-chmod 0440 /etc/sudoers.d/phoenix
+chmod 0440 /etc/sudoers.d/jcvpn
 
-echo "[6/6] Installing Systemd service & WireGuard..."
-cp systemd/phoenix-api.service /etc/systemd/system/phoenix-api.service
+echo "[6/6] Installing Systemd service..."
+cp systemd/jcvpn-api.service /etc/systemd/system/jcvpn-api.service
 systemctl daemon-reload
-systemctl enable phoenix-api.service
-
-if [ -f scripts/setup-wireguard.sh ]; then
-  chmod +x scripts/setup-wireguard.sh
-  ./scripts/setup-wireguard.sh || true
-fi
-
-systemctl restart phoenix-api.service || true
+systemctl enable jcvpn-api.service
+systemctl restart jcvpn-api.service || true
 
 echo "=================================================="
-echo "      PHOENIX INSTALLATION COMPLETE!            "
+echo "      JC VPN INSTALLATION COMPLETE!             "
 echo "=================================================="
-echo " Server Public IP:    $PUBLIC_IP"
-echo " API Endpoint URL:    http://${PUBLIC_IP}:9300"
-echo " Admin Web Dashboard: http://${PUBLIC_IP}:9300/admin"
-echo " Systemd status:"
-systemctl status phoenix-api.service --no-pager || true
+echo "Systemd service status:"
+systemctl status jcvpn-api.service --no-pager || true

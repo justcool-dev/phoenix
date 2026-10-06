@@ -10,8 +10,11 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
+# Ensure WireGuard kernel module is loaded if available
+modprobe wireguard 2>/dev/null || true
+
 WG_IF="wg0"
-WG_PORT="51820"
+WG_PORT="9301"
 
 # Auto-detect default outbound network interface (e.g. eth0, ens3, enp1s0, ens6)
 DETECTED_IF=$(ip route show default | awk '/default/ {print $5}' | head -n1 || true)
@@ -51,11 +54,13 @@ EOF
 chmod 600 "$WG_DIR/$WG_IF.conf"
 
 echo "[4/4] Enabling IPv4 forwarding & firewall rules..."
-sysctl -w net.ipv4.ip_forward=1
-if grep -q "net.ipv4.ip_forward" /etc/sysctl.conf; then
-  sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
-else
-  echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+sysctl -w net.ipv4.ip_forward=1 || true
+if [ -f /etc/sysctl.conf ]; then
+  if grep -q "net.ipv4.ip_forward" /etc/sysctl.conf; then
+    sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
+  else
+    echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+  fi
 fi
 
 # Configure firewall based on active service (firewalld for Rocky Linux / RHEL, UFW for Ubuntu/Debian)
@@ -75,8 +80,11 @@ else
   iptables -A INPUT -p tcp --dport 9300 -j ACCEPT || true
 fi
 
-systemctl enable wg-quick@$WG_IF
-systemctl restart wg-quick@$WG_IF
+# Stop existing interface if active to ensure clean restart
+wg-quick down $WG_IF 2>/dev/null || true
+
+systemctl enable wg-quick@$WG_IF || true
+systemctl restart wg-quick@$WG_IF || wg-quick up $WG_IF || true
 
 echo "=================================================="
 echo " WireGuard interface $WG_IF active on port $WG_PORT "

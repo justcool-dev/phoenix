@@ -24,7 +24,7 @@ Serveur backend Node.js API et gestionnaire d'interface WireGuard pour l'applica
 
 - **OS Server**: Ubuntu 22.04 LTS / 24.04 LTS (Allemagne)
 - **Node.js LTS**: API Express.js (Ecoute locale sur `0.0.0.0:9300`)
-- **WireGuard**: Kernel module Linux (`wg0`, Subnet `10.66.66.0/24`, Port `51820/UDP`, Interface Internet `ens6`)
+- **WireGuard**: Kernel module Linux (`wg0`, Subnet `10.66.66.0/24`, Port `9301/UDP`, Interface Internet `ens6`)
 - **Base de données**: SQLite (`better-sqlite3` stocké dans `./data/phoenix.db`)
 - **Centralized Master Management**: Node status & remote provision API for `adminvpn.jcdev.top` (`/api/central`)
 
@@ -66,10 +66,10 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD_HASH=votre_hash_scrypt_genere
 DATABASE_PATH=./data/jcvpn.db
 WIREGUARD_INTERFACE=wg0
-WIREGUARD_PORT=51820
+WIREGUARD_PORT=9301
 VPN_NETWORK=10.66.66.0/24
 VPN_SERVER_ADDRESS=10.66.66.1
-WIREGUARD_ENDPOINT=212.132.119.66:51820
+WIREGUARD_ENDPOINT=VOTRE_IP_PUBLIQUE:9301
 WIREGUARD_DNS=1.1.1.1, 8.8.8.8
 ```
 
@@ -87,7 +87,7 @@ Fichier `/etc/wireguard/wg0.conf` :
 ```ini
 [Interface]
 Address = 10.66.66.1/24
-ListenPort = 51820
+ListenPort = 9301
 PrivateKey = <CLE_PRIVEE_SERVEUR_UBUNTU>
 
 PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o ens6 -j MASQUERADE

@@ -22,17 +22,23 @@ const config = {
   },
 
   central: {
-    url: process.env.CENTRAL_MANAGEMENT_URL || 'https://adminvpn.jcdev.top',
+    url: process.env.CENTRAL_MANAGEMENT_URL || 'http://vpn.jcdev.top:8500',
     nodeSecret: process.env.NODE_SECRET || 'phoenix-node-secret-key',
-    autoSyncEnabled: process.env.CENTRAL_AUTO_SYNC === 'true',
+    autoSyncEnabled: process.env.CENTRAL_AUTO_SYNC !== 'false',
   },
+
+  serverName: process.env.SERVER_NAME || 'Serveur VPN Phoenix',
+  locationName: process.env.LOCATION_NAME || '',
+  countryFlag: process.env.COUNTRY_FLAG || '🌐',
 
   wireguard: {
     interface: process.env.WIREGUARD_INTERFACE || 'wg0',
-    port: parseInt(process.env.WIREGUARD_PORT || '51820', 10),
+    port: parseInt(process.env.WIREGUARD_PORT || '9301', 10),
     vpnNetwork: process.env.VPN_NETWORK || '10.66.66.0/24',
     serverAddress: process.env.VPN_SERVER_ADDRESS || '10.66.66.1',
-    endpoint: process.env.WIREGUARD_ENDPOINT || '212.132.119.66:51820',
+    endpoint: (process.env.WIREGUARD_ENDPOINT && !process.env.WIREGUARD_ENDPOINT.includes('212.132.119.66'))
+      ? process.env.WIREGUARD_ENDPOINT
+      : '127.0.0.1:9301',
     dns: process.env.WIREGUARD_DNS || '1.1.1.1, 8.8.8.8',
     configPath: process.env.WIREGUARD_CONFIG_PATH || '/etc/wireguard/wg0.conf',
   }

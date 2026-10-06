@@ -21,6 +21,9 @@ router.get('/health', (req, res) => {
  */
 router.get('/info', (req, res) => {
   return res.json({
+    serverName: config.serverName,
+    locationName: config.locationName,
+    countryFlag: config.countryFlag,
     vpnEndpoint: config.wireguard.endpoint,
     vpnPort: config.wireguard.port,
     serverAddress: config.wireguard.serverAddress,

@@ -168,7 +168,7 @@ class WireGuardService {
           // Interface header line: private-key, public-key, listen-port, fwmark
           interfaceInfo = {
             publicKey: parts[1] || '',
-            listenPort: parseInt(parts[2] || '51820', 10),
+            listenPort: parseInt(parts[2] || '9301', 10),
           };
         } else if (parts.length >= 7) {
           // Peer line
